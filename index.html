@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎯 몬티홀 실험</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f1f5f9; min-height: 100vh; display: flex; justify-content: center; padding: 16px; }
+  .wrap { width: 100%; max-width: 660px; }
+  h2 { text-align: center; margin-bottom: 4px; font-size: 22px; }
+  .sub { text-align: center; color: #666; font-size: 13px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 8px 0; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; background: #e5e7eb; color: #333; }
+  .tab.active { background: #4f46e5; color: #fff; }
+  .panel { display: none; } .panel.active { display: block; }
+
+  /* doors */
+  .doors { display: flex; gap: 12px; justify-content: center; margin-bottom: 16px; }
+  .door { width: 100px; height: 120px; border-radius: 12px; border: 2px solid #94a3b8; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .door .emoji { font-size: 36px; }
+  .door .lbl { font-size: 11px; color: #555; margin-top: 6px; text-align: center; }
+  .door.picked { border-color: #4f46e5; background: #eef2ff; }
+  .door.opened { border-color: #d1d5db; background: #f3f4f6; cursor: default; }
+  .door.final { border-color: #059669; background: #ecfdf5; }
+
+  /* instruction */
+  .instr { text-align: center; min-height: 64px; margin-bottom: 12px; }
+  .instr p { font-weight: 600; margin-bottom: 10px; }
+  .instr .blue { color: #4f46e5; }
+  .instr .amber { color: #b45309; }
+  .instr .result-txt { font-size: 22px; font-weight: 700; }
+  .instr .result-sub { font-size: 13px; color: #666; margin-bottom: 8px; }
+  .btn-row { display: flex; gap: 10px; justify-content: center; }
+  .btn { padding: 10px 24px; border-radius: 8px; border: none; font-weight: 700; font-size: 15px; cursor: pointer; color: #fff; }
+  .btn-stay { background: #4f46e5; }
+  .btn-switch { background: #059669; }
+  .btn-reset { background: #f3f4f6; color: #333; font-size: 14px; padding: 7px 22px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+  .win { color: #059669; } .lose { color: #dc2626; }
+
+  /* stats box */
+  .stats-box { background: #f8fafc; border-radius: 12px; padding: 12px; margin-top: 4px; }
+  .stats-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .stat-cards { display: flex; gap: 12px; margin-bottom: 12px; }
+  .stat-card { flex: 1; background: #fff; border-radius: 8px; padding: 10px; text-align: center; }
+  .stat-card .slbl { font-size: 12px; color: #666; }
+  .stat-card .sval { font-size: 22px; font-weight: 700; }
+  .stat-card .ssub { font-size: 11px; color: #999; }
+  .green { color: #059669; } .indigo { color: #4f46e5; }
+  .border-green { border: 1px solid rgba(5,150,105,0.2); }
+  .border-indigo { border: 1px solid rgba(79,70,229,0.2); }
+
+  /* history table */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+  th { padding: 6px 8px; text-align: left; background: #e0e7ff; }
+  th:not(:first-child) { text-align: center; }
+  td { padding: 5px 8px; }
+  td:not(:first-child) { text-align: center; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:nth-child(odd) td { background: #fff; }
+
+  /* sim */
+  .sim-start { text-align: center; padding: 32px 0; }
+  .sim-start p { color: #666; margin-bottom: 16px; }
+  .btn-start { padding: 12px 32px; border-radius: 10px; border: none; background: #4f46e5; color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .sim-cards { display: flex; gap: 12px; margin-bottom: 12px; }
+  .sim-card { flex: 1; background: #fff; border-radius: 12px; padding: 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .sim-card .sc-lbl { font-size: 12px; color: #666; }
+  .sim-card .sc-val { font-size: 24px; font-weight: 700; }
+  .sim-card .sc-theory { font-size: 11px; color: #999; }
+  .progress-wrap { margin-bottom: 12px; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px; }
+  .progress-bar { background: #e5e7eb; border-radius: 99px; height: 8px; }
+  .progress-fill { background: #4f46e5; border-radius: 99px; height: 8px; width: 0%; transition: width 0.1s; }
+  .chart-box { background: #f8fafc; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  .chart-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+  .btn-restart { width: 100%; padding: 8px 0; border-radius: 8px; border: none; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer; margin-top: 4px; font-size: 14px; }
+  canvas { max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>🎯 몬티홀 실험</h2>
+  <p class="sub">직접 플레이하고 시뮬레이션과 비교해보세요</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('game')">🎮 직접 실험</button>
+    <button class="tab" onclick="switchTab('sim')">🤖 시뮬레이션</button>
+  </div>
+
+  <!-- GAME PANEL -->
+  <div class="panel active" id="panel-game">
+    <div class="doors" id="doors">
+      <div class="door" id="door0" onclick="pickDoor(0)">
+        <div class="emoji" id="emoji0">🚪</div>
+        <div class="lbl" id="lbl0">문 1</div>
+      </div>
+      <div class="door" id="door1" onclick="pickDoor(1)">
+        <div class="emoji" id="emoji1">🚪</div>
+        <div class="lbl" id="lbl1">문 2</div>
+      </div>
+      <div class="door" id="door2" onclick="pickDoor(2)">
+        <div class="emoji" id="emoji2">🚪</div>
+        <div class="lbl" id="lbl2">문 3</div>
+      </div>
+    </div>
+
+    <div class="instr" id="instr">
+      <p class="blue">문을 하나 클릭해서 선택하세요!</p>
+    </div>
+
+    <div id="stats-section" style="display:none">
+      <div class="stats-box">
+        <div class="stats-title" id="stats-title">📊 내 실험 결과 (0회)</div>
+        <div class="stat-cards">
+          <div class="stat-card border-green">
+            <div class="slbl">바꿨을 때</div>
+            <div class="sval green" id="sw-rate">-</div>
+            <div class="ssub" id="sw-sub">0회 중 0번 성공</div>
+          </div>
+          <div class="stat-card border-indigo">
+            <div class="slbl">유지했을 때</div>
+            <div class="sval indigo" id="st-rate">-</div>
+            <div class="ssub" id="st-sub">0회 중 0번 성공</div>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>선택</th><th>결과</th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIM PANEL -->
+  <div class="panel" id="panel-sim">
+    <div id="sim-start" class="sim-start">
+      <p>버튼을 눌러 3,000회 시뮬레이션을 실시간으로 실행해보세요!</p>
+      <button class="btn-start" onclick="startSim()">▶ 시뮬레이션 시작</button>
+    </div>
+    <div id="sim-running" style="display:none">
+      <div class="sim-cards">
+        <div class="sim-card border-green">
+          <div class="sc-lbl">바꿨을 때 승률</div>
+          <div class="sc-val green" id="sim-sw-val">-</div>
+          <div class="sc-theory">이론값 66.7%</div>
+        </div>
+        <div class="sim-card border-indigo">
+          <div class="sc-lbl">유지했을 때 승률</div>
+          <div class="sc-val indigo" id="sim-st-val">-</div>
+          <div class="sc-theory">이론값 33.3%</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span id="sim-status">⏳ 실행 중...</span>
+          <span id="sim-count">0 / 3,000회</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">📈 승률 수렴 그래프</div>
+        <canvas id="line-chart" height="180"></canvas>
+      </div>
+      <div id="sim-result" style="display:none">
+        <div class="chart-box">
+          <div class="chart-title">📋 최종 결과표</div>
+          <table>
+            <thead>
+              <tr>
+                <th>전략</th><th>당첨</th><th>꽝</th><th>실험 승률</th><th>이론값</th>
+              </tr>
+            </thead>
+            <tbody id="result-body"></tbody>
+          </table>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">📊 실험결과 vs 이론값 비교</div>
+          <canvas id="bar-chart" height="160"></canvas>
+        </div>
+        <button class="btn-restart" onclick="restartSim()">🔄 다시 시뮬레이션</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── GAME ──
+let car, picked, opened, phase = "pick";
+let history = [];
+let swWin = 0, swTotal = 0, stWin = 0, stTotal = 0;
+
+function newGame() {
+  car = Math.floor(Math.random() * 3);
+  picked = null; opened = null; phase = "pick";
+  for (let d = 0; d < 3; d++) {
+    const el = document.getElementById("door" + d);
+    el.className = "door";
+    el.onclick = () => pickDoor(d);
+    document.getElementById("emoji" + d).textContent = "🚪";
+    document.getElementById("lbl" + d).textContent = "문 " + (d + 1);
+  }
+  document.getElementById("instr").innerHTML = '<p class="blue">문을 하나 클릭해서 선택하세요!</p>';
+}
+
+function pickDoor(d) {
+  if (phase !== "pick") return;
+  picked = d; phase = "reveal";
+  let o;
+  do { o = Math.floor(Math.random() * 3); } while (o === d || o === car);
+  opened = o;
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById("door" + i);
+    el.onclick = null;
+    if (i === d) { el.className = "door picked"; document.getElementById("lbl" + i).textContent = "내 선택"; }
+    else if (i === o) { el.className = "door opened"; document.getElementById("emoji" + i).textContent = "🐐"; document.getElementById("lbl" + i).textContent = "염소!"; }
+    else { document.getElementById("lbl" + i).textContent = "바꿀 수 있어요"; }
+  }
+  document.getElementById("instr").innerHTML =
+    '<p class="amber">사회자가 염소 문을 열었어요! 바꿀까요?</p>' +
+    '<div class="btn-row"><button class="btn btn-stay" onclick="choose(\'stay\')">유지하기</button>' +
+    '<button class="btn btn-switch" onclick="choose(\'switch\')">바꾸기</button></div>';
+}
+
+function choose(choice) {
+  if (phase !== "reveal") return;
+  phase = "result";
+  let fd = picked;
+  if (choice === "switch") {
+    for (let d = 0; d < 3; d++) { if (d !== picked && d !== opened) { fd = d; break; } }
+  }
+  const won = fd === car;
+  // update doors
+  for (let i = 0; i < 3; i++) {
+    document.getElementById("emoji" + i).textContent = (i === car) ? "🚗" : "🐐";
+    const el = document.getElementById("door" + i);
+    if (i === fd) { el.className = "door final"; document.getElementById("lbl" + i).textContent = "최종선택"; }
+    else if (i === opened) { el.className = "door opened"; document.getElementById("lbl" + i).textContent = "열린 문"; }
+    else { el.className = "door"; document.getElementById("lbl" + i).textContent = ""; }
+  }
+  if (choice === "switch") { swTotal++; if (won) swWin++; }
+  else { stTotal++; if (won) stWin++; }
+  history.push({ choice, won });
+  document.getElementById("instr").innerHTML =
+    `<p class="result-txt ${won ? "win" : "lose"}">${won ? "🎉 당첨!" : "😢 꽝!"}</p>` +
+    `<p class="result-sub">${choice === "switch" ? "바꿨어요" : "유지했어요"} → 문 ${fd + 1}번</p>` +
+    `<button class="btn-reset" onclick="newGame()">다시 하기</button>`;
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById("stats-section").style.display = "block";
+  document.getElementById("stats-title").textContent = `📊 내 실험 결과 (${history.length}회)`;
+  document.getElementById("sw-rate").textContent = swTotal ? Math.round(swWin / swTotal * 100) + "%" : "-";
+  document.getElementById("sw-sub").textContent = `${swTotal}회 중 ${swWin}번 성공`;
+  document.getElementById("st-rate").textContent = stTotal ? Math.round(stWin / stTotal * 100) + "%" : "-";
+  document.getElementById("st-sub").textContent = `${stTotal}회 중 ${stWin}번 성공`;
+  const tbody = document.getElementById("history-body");
+  const last10 = history.slice(-10);
+  tbody.innerHTML = last10.map((h, i) => {
+    const num = history.length - last10.length + i + 1;
+    const choiceTxt = h.choice === "switch"
+      ? `<span class="green" style="font-weight:600">바꿈</span>`
+      : `<span class="indigo" style="font-weight:600">유지</span>`;
+    return `<tr><td style="color:#999">${num}</td><td>${choiceTxt}</td><td>${h.won ? "🎉 당첨" : "😢 꽝"}</td></tr>`;
+  }).join("");
+}
+
+newGame();
+
+// ── SIM ──
+const TOTAL = 3000, BATCH = 30, INTERVAL = 30;
+let simTimer = null, lineChart = null, barChart = null;
+
+function switchTab(t) {
+  document.querySelectorAll(".tab").forEach((b, i) => b.classList.toggle("active", (i === 0) === (t === "game")));
+  document.getElementById("panel-game").classList.toggle("active", t === "game");
+  document.getElementById("panel-sim").classList.toggle("active", t === "sim");
+}
+
+function startSim() {
+  document.getElementById("sim-start").style.display = "none";
+  document.getElementById("sim-running").style.display = "block";
+  document.getElementById("sim-result").style.display = "none";
+  if (lineChart) { lineChart.destroy(); lineChart = null; }
+  if (barChart) { barChart.destroy(); barChart = null; }
+
+  const ctx = document.getElementById("line-chart").getContext("2d");
+  lineChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "바꿈", data: [], borderColor: "#059669", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+        { label: "유지", data: [], borderColor: "#4f46e5", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+      ]
+    },
+    options: {
+      animation: false, responsive: true,
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxTicksLimit: 8 } },
+        y: { min: 0, max: 100, ticks: { font: { size: 10 }, callback: v => v + "%" } }
+      },
+      plugins: {
+        legend: { labels: { font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + ctx.parsed.y + "%" } },
+        annotation: {}
+      }
+    }
+  });
+
+  let count = 0, sw = 0, st = 0, lastPt = 0;
+  simTimer = setInterval(() => {
+    for (let i = 0; i < BATCH; i++) {
+      const c = Math.floor(Math.random() * 3);
+      const p = Math.floor(Math.random() * 3);
+      let o; do { o = Math.floor(Math.random() * 3); } while (o === p || o === c);
+      let s; for (let d = 0; d < 3; d++) { if (d !== p && d !== o) { s = d; break; } }
+      if (s === c) sw++;
+      if (p === c) st++;
+      count++;
+    }
+    document.getElementById("sim-sw-val").textContent = (sw / count * 100).toFixed(1) + "%";
+    document.getElementById("sim-st-val").textContent = (st / count * 100).toFixed(1) + "%";
+    document.getElementById("sim-count").textContent = count.toLocaleString() + " / 3,000회";
+    document.getElementById("progress-fill").style.width = Math.min(count / TOTAL * 100, 100) + "%";
+    if (count - lastPt >= 100) {
+      lastPt = count;
+      lineChart.data.labels.push(count);
+      lineChart.data.datasets[0].data.push(parseFloat((sw / count * 100).toFixed(1)));
+      lineChart.data.datasets[1].data.push(parseFloat((st / count * 100).toFixed(1)));
+      lineChart.update("none");
+    }
+    if (count >= TOTAL) {
+      clearInterval(simTimer);
+      document.getElementById("sim-status").textContent = "✅ 완료";
+      showResult(sw, st, count);
+    }
+  }, INTERVAL);
+}
+
+function showResult(sw, st, total) {
+  document.getElementById("sim-result").style.display = "block";
+  const tbody = document.getElementById("result-body");
+  const rows = [
+    { label: "바꿨을 때", wins: sw, losses: total - sw, rate: (sw/total*100).toFixed(1), theory: "66.7%" },
+    { label: "유지했을 때", wins: st, losses: total - st, rate: (st/total*100).toFixed(1), theory: "33.3%" },
+  ];
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td style="font-weight:600">${r.label}</td>
+      <td style="color:#059669">${r.wins.toLocaleString()}</td>
+      <td style="color:#dc2626">${r.losses.toLocaleString()}</td>
+      <td style="font-weight:700">${r.rate}%</td>
+      <td style="color:#666">${r.theory}</td>
+    </tr>`).join("");
+  const ctx2 = document.getElementById("bar-chart").getContext("2d");
+  if (barChart) barChart.destroy();
+  barChart = new Chart(ctx2, {
+    type: "bar",
+    data: {
+      labels: ["바꿈", "유지"],
+      datasets: [
+        { label: "실험결과", data: [parseFloat((sw/total*100).toFixed(1)), parseFloat((st/total*100).toFixed(1))], backgroundColor: "#818cf8", borderRadius: 4 },
+        { label: "이론값", data: [66.7, 33.3], backgroundColor: "#d1d5db", borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { min: 0, max: 100, ticks: { callback: v => v + "%" } }
+      },
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + ctx.parsed.y + "%" } } }
+    }
+  });
+}
+
+function restartSim() {
+  if (simTimer) clearInterval(simTimer);
+  document.getElementById("sim-start").style.display = "block";
+  document.getElementById("sim-running").style.display = "none";
+}
+</script>
+</body>
+</html>
